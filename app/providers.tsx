@@ -2,9 +2,24 @@
 
 import { PrivyProvider } from '@privy-io/react-auth';
 import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 
 const solanaConnectors = toSolanaWalletConnectors({
   shouldAutoConnect: true,
+});
+
+
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1976d2', // MUI 默认蓝色
+    },
+    secondary: {
+      main: '#dc004e', // MUI 默认粉色
+    },
+  },
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -51,7 +66,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      {children}
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        {children}
+      </ThemeProvider>
     </PrivyProvider>
   );
 }

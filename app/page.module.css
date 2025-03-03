@@ -61,17 +61,14 @@
   gap: 16px;
 }
 
-.ctas a {
+.ctas div {
   appearance: none;
   border-radius: 128px;
   height: 48px;
   padding: 0 20px;
   border: none;
   border: 1px solid transparent;
-  transition:
-    background 0.2s,
-    color 0.2s,
-    border-color 0.2s;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -81,13 +78,13 @@
   font-weight: 500;
 }
 
-a.primary {
+div.primary {
   background: var(--foreground);
   color: var(--background);
   gap: 8px;
 }
 
-a.secondary {
+div.secondary {
   border-color: var(--gray-alpha-200);
   min-width: 180px;
 }

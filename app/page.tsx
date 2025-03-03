@@ -2,6 +2,8 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import styles from "./page.module.css";
+import { Button } from "@mui/material";
+import { test } from "@/lib/swap/solana-quote";
 
 export default function Home() {
   const { login, user, logout } = usePrivy();
@@ -25,6 +27,7 @@ export default function Home() {
             <p>{user?.wallet?.address}</p>
           </div>
         </div>
+        <Button onClick={() => test()}>test</Button>
       </main>
     </div>
   );

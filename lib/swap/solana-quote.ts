@@ -5,7 +5,7 @@ import { getHeaders } from "./okx-request";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { QuoteResponse } from "@/types/okx-quote";
 
-const proxyAgent = new HttpsProxyAgent("http://127.0.0.1:7890");
+// const proxyAgent = new HttpsProxyAgent("http://127.0.0.1:7890");
 
 export async function getQuote(params: any): Promise<QuoteResponse | null> {
     try {
@@ -18,7 +18,7 @@ export async function getQuote(params: any): Promise<QuoteResponse | null> {
         const response = await fetch(`https://www.okx.com${requestPath}${queryString}`, {
             method: "GET",
             headers,
-            agent: proxyAgent, // 确保 proxyAgent 定义正确
+            // agent: proxyAgent, // 确保 proxyAgent 定义正确
         });
 
         // 检查 HTTP 响应状态码

@@ -5,7 +5,7 @@ import { getHeaders } from "./okx-request";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { SwapResponse } from "@/types/okx-swap";
 
-const proxyAgent = new HttpsProxyAgent("http://127.0.0.1:7890");
+// const proxyAgent = new HttpsProxyAgent("http://127.0.0.1:7890");
 
 export async function getSwapData(params: any): Promise<SwapResponse | null> {
     try {
@@ -18,7 +18,7 @@ export async function getSwapData(params: any): Promise<SwapResponse | null> {
         const response = await fetch(`https://www.okx.com${requestPath}${queryString}`, {
             method: "GET",
             headers,
-            agent: proxyAgent,
+            // agent: proxyAgent,
         });
 
         if (!response.ok) {

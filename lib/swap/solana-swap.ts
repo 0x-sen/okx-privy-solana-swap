@@ -147,7 +147,7 @@ async function ensureATAExists(connection: Connection, payer: PublicKey, owner: 
         const transaction = new Transaction().add(
             createAssociatedTokenAccountInstruction(payer, ata, owner, mint)
         );
-        await sendAndConfirmTransaction(connection, transaction, [payer]);
+        // await sendAndConfirmTransaction(connection, transaction, [payer]);
         console.log("✅ ATA Created:", ata.toBase58());
         return ata;
     }

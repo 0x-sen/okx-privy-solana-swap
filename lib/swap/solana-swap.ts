@@ -1,15 +1,17 @@
 // swap.ts
 // import base58 from "bs58";
 import BN from "bn.js";
-import * as solanaWeb3 from "@solana/web3.js";
-import { Connection, GetVersionedTransactionConfig } from "@solana/web3.js";
-import cryptoJS from "crypto-js";
+// import * as solanaWeb3 from "@solana/web3.js";
+import { Connection, GetVersionedTransactionConfig, PublicKey, sendAndConfirmTransaction, Transaction } from "@solana/web3.js";
+// import cryptoJS from "crypto-js";
 import { getHeaders } from "./okx-request";
+import { getSwapData } from "./solana-swap-data";
+import { createAssociatedTokenAccountInstruction, getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 
 // Constants
 const SOLANA_CHAIN_ID = "501";
-const COMPUTE_UNITS = 300000;
-const MAX_RETRIES = 3;
+// const COMPUTE_UNITS = 300000;
+// const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000; // 1 second
 const MAX_RETRY_DELAY = 10000; // 10 seconds
 
@@ -19,7 +21,7 @@ const connection = new Connection(`${process.env.NEXT_PUBLIC_RPC_URL}`, {
 
 type TransactionStatus = 'confirmed' | 'finalized' | 'processed' | 'dropped' | 'unknown';
 
-async function getTransactionStatus(txId: string): Promise<TransactionStatus> {
+export async function getTransactionStatus(txId: string): Promise<TransactionStatus> {
     try {
         const confirmedTx: GetVersionedTransactionConfig = {
             maxSupportedTransactionVersion: 0,
@@ -53,7 +55,7 @@ async function isTransactionConfirmed(txId: string) {
     return status === 'confirmed' || status === 'finalized';
 }
 
-function calculateRetryDelay(retryCount: number): number {
+export function calculateRetryDelay(retryCount: number): number {
     // Exponential backoff with jitter
     const exponentialDelay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
     const jitter = Math.random() * 1000; // Random delay between 0-1000ms
@@ -103,7 +105,7 @@ async function getTokenInfo(fromTokenAddress: string, toTokenAddress: string) {
     };
 }
 
-function convertAmount(amount: string, decimals: number) {
+export function convertAmount(amount: string, decimals: number) {
     try {
         if (!amount || isNaN(parseFloat(amount))) {
             throw new Error("Invalid amount");
@@ -119,3 +121,204 @@ function convertAmount(amount: string, decimals: number) {
     }
 }
 
+export async function testSwap(){
+    // Get swap quote
+    const quoteParams = {
+        chainId: SOLANA_CHAIN_ID,
+        amount: '100000',
+        fromTokenAddress:'So11111111111111111111111111111111111111112',
+        toTokenAddress:'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+        slippage: "0.5",
+        userWalletAddress: 'CPs3Fgw2xcRM7o9XFRuFhrQwjV9MokqRwh7z3Lsmnje5',
+    } as Record<string, string>;
+    const swapData = await getSwapData(quoteParams)
+    console.log('swapData',swapData);
+    
+}
+
+async function ensureATAExists(connection: Connection, payer: PublicKey, owner: PublicKey, mint: PublicKey) {
+    const ata = await getAssociatedTokenAddress(mint, owner);
+    try {
+        await getAccount(connection, ata);
+        console.log("✅ ATA exists:", ata.toBase58());
+        return ata;
+    } catch {
+        console.log("⚠️ ATA does not exist, creating...");
+        const transaction = new Transaction().add(
+            createAssociatedTokenAccountInstruction(payer, ata, owner, mint)
+        );
+        await sendAndConfirmTransaction(connection, transaction, [payer]);
+        console.log("✅ ATA Created:", ata.toBase58());
+        return ata;
+    }
+}
+
+// async function main() {
+//     try {
+//         const args = process.argv.slice(2);
+//         if (args.length < 3) {
+//             console.log("Usage: ts-node swap.ts <amount> <fromTokenAddress> <toTokenAddress>");
+//             console.log("Example: ts-node swap.ts 1.5 11111111111111111111111111111111 EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+//             process.exit(1);
+//         }
+
+//         const [amount, fromTokenAddress, toTokenAddress] = args;
+
+//         if (!userPrivateKey || !userAddress) {
+//             throw new Error("Private key or user address not found");
+//         }
+
+//         // Get token information
+//         console.log("Getting token information...");
+//         const tokenInfo = await getTokenInfo(fromTokenAddress, toTokenAddress);
+//         console.log(`From: ${tokenInfo.fromToken.symbol} (${tokenInfo.fromToken.decimals} decimals)`);
+//         console.log(`To: ${tokenInfo.toToken.symbol} (${tokenInfo.toToken.decimals} decimals)`);
+
+//         // Convert amount using fetched decimals
+//         const rawAmount = convertAmount(amount, tokenInfo.fromToken.decimals);
+//         console.log(`Amount in ${tokenInfo.fromToken.symbol} base units:`, rawAmount);
+
+//         // Get swap quote
+//         const quoteParams = {
+//             chainId: SOLANA_CHAIN_ID,
+//             amount: rawAmount,
+//             fromTokenAddress,
+//             toTokenAddress,
+//             slippage: "0.5",
+//             userWalletAddress: userAddress,
+//         } as Record<string, string>;
+
+//         // Get swap data
+//         const timestamp = new Date().toISOString();
+//         const requestPath = "/api/v5/dex/aggregator/swap";
+//         const queryString = "?" + new URLSearchParams(quoteParams).toString();
+//         const headers = getHeaders(timestamp, "GET", requestPath, queryString);
+
+//         console.log("Requesting swap quote...");
+//         const response = await fetch(
+//             `https://www.okx.com${requestPath}${queryString}`,
+//             { method: "GET", headers }
+//         );
+
+//         const data = await response.json();
+//         if (data.code !== "0") {
+//             throw new Error(`API Error: ${data.msg}`);
+//         }
+
+//         const swapData = data.data[0];
+
+//         // Show estimated output and price impact
+//         const outputAmount = parseFloat(swapData.routerResult.toTokenAmount) / Math.pow(10, tokenInfo.toToken.decimals);
+//         console.log("\nSwap Quote:");
+//         console.log(`Input: ${amount} ${tokenInfo.fromToken.symbol} ($${(parseFloat(amount) * parseFloat(tokenInfo.fromToken.price)).toFixed(2)})`);
+//         console.log(`Output: ${outputAmount.toFixed(tokenInfo.toToken.decimals)} ${tokenInfo.toToken.symbol} ($${(outputAmount * parseFloat(tokenInfo.toToken.price)).toFixed(2)})`);
+//         if (swapData.priceImpactPercentage) {
+//             console.log(`Price Impact: ${swapData.priceImpactPercentage}%`);
+//         }
+
+//         console.log("\nExecuting swap transaction...");
+//         let retryCount = 0;
+//         let txId;
+//         while (retryCount < MAX_RETRIES) {
+//             try {
+//                 if (!swapData || (!swapData.tx && !swapData.data)) {
+//                     throw new Error("Invalid swap data structure");
+//                 }
+
+//                 const transactionData = swapData.tx?.data || swapData.data;
+//                 if (!transactionData || typeof transactionData !== 'string') {
+//                     throw new Error("Invalid transaction data");
+//                 }
+
+//                 const recentBlockHash = await connection.getLatestBlockhash();
+//                 console.log("Got blockhash:", recentBlockHash.blockhash);
+
+//                 const decodedTransaction = base58.decode(transactionData);
+//                 let tx;
+
+//                 try {
+//                     tx = solanaWeb3.VersionedTransaction.deserialize(decodedTransaction);
+//                     console.log("Successfully created versioned transaction");
+//                     tx.message.recentBlockhash = recentBlockHash.blockhash;
+//                 } catch (e) {
+//                     console.log("Versioned transaction failed, trying legacy:", e);
+//                     tx = solanaWeb3.Transaction.from(decodedTransaction);
+//                     console.log("Successfully created legacy transaction");
+//                     tx.recentBlockhash = recentBlockHash.blockhash;
+//                 }
+
+//                 const computeBudgetIx = solanaWeb3.ComputeBudgetProgram.setComputeUnitLimit({
+//                     units: COMPUTE_UNITS
+//                 });
+
+//                 const feePayer = solanaWeb3.Keypair.fromSecretKey(
+//                     base58.decode(userPrivateKey)
+//                 );
+
+//                 if (tx instanceof solanaWeb3.VersionedTransaction) {
+//                     tx.sign([feePayer]);
+//                 } else {
+//                     tx.partialSign(feePayer);
+//                 }
+
+//                 txId = await connection.sendRawTransaction(tx.serialize(), {
+//                     skipPreflight: false,
+//                     maxRetries: MAX_RETRIES
+//                 });
+
+//                 const confirmation = await connection.confirmTransaction({
+//                     signature: txId,
+//                     blockhash: recentBlockHash.blockhash,
+//                     lastValidBlockHeight: recentBlockHash.lastValidBlockHeight
+//                 }, 'confirmed');
+
+//                 if (confirmation?.value?.err) {
+//                     throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+//                 }
+
+//                 console.log("\nSwap completed successfully!");
+//                 console.log("Transaction ID:", txId);
+//                 console.log("Explorer URL:", `https://solscan.io/tx/${txId}`);
+
+//                 process.exit(0);
+//             } catch (error) {
+//                 console.error(`Attempt ${retryCount + 1} failed:`, error);
+
+//                 if (txId) {
+//                     const status = await getTransactionStatus(txId);
+//                     console.log(`Transaction status: ${status}`);
+
+//                     switch (status) {
+//                         case 'finalized':
+//                         case 'confirmed':
+//                             console.log("Transaction confirmed successfully, no retry needed.");
+//                             process.exit(0);
+//                         case 'processed':
+//                             console.log("Transaction processed but not confirmed, waiting longer...");
+//                             await new Promise(resolve => setTimeout(resolve, 5000)); // Extra wait for confirmation
+//                             break;
+//                         case 'dropped':
+//                             console.log("Transaction dropped, will retry with new blockhash");
+//                             break;
+//                         case 'unknown':
+//                             console.log("Transaction status unknown, proceeding with retry");
+//                             break;
+//                     }
+//                 }
+
+//                 retryCount++;
+
+//                 if (retryCount === MAX_RETRIES) {
+//                     throw error;
+//                 }
+
+//                 const delay = calculateRetryDelay(retryCount);
+//                 console.log(`Waiting ${delay}ms before retry ${retryCount + 1}/${MAX_RETRIES}...`);
+//                 await new Promise(resolve => setTimeout(resolve, delay));
+//             }
+//         }
+//     } catch (error) {
+//         console.error("Error:", error instanceof Error ? error.message : "Unknown error");
+//         process.exit(1);
+//     }
+// }
